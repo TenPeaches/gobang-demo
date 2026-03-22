@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.gobang.mapper.UserMapper">
+
+    <!-- 注册用户 -->
+    <insert id="insertUser" parameterType="com.gobang.entity.User">
+        INSERT INTO gobang_db.`user`(username, password, score, total_games, win_games)
+        VALUES(#{username}, #{password}, #{score}, #{totalGames}, #{winGames})
+    </insert>
+
+    <!-- 根据用户名查询用户信息 -->
+    <select id="selectUserByUsername" parameterType="String" resultType="com.gobang.entity.User">
+        SELECT id, username, password, score, total_games, win_games
+        FROM gobang_db.`user`
+        WHERE username = #{username}
+    </select>
+
+    <!-- 更新用户数据 -->
+    <update id="updateUserStats">
+        UPDATE gobang_db.`user`
+        SET score = #{score}, total_games = #{totalGames}, win_games = #{winGames}
+        WHERE id = #{id}
+    </update>
+
+</mapper>

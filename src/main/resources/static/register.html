@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>五子棋 - 注册</title>
+    <style>
+        * {margin: 0; padding: 0; box-sizing: border-box;}
+        body {
+            background: url("./img/register-bg.jpg") no-repeat center center;
+            background-size: cover;
+            height: 100vh;
+            display: flex;
+            justify-content: center;/* 水平居中 */
+            align-items: center;/* 垂直居中 */
+        }
+        .register-box {
+            background: rgba(255,255,255,0.8);/* 白色半透明，不遮挡背景图 */
+            padding: 30px;
+            border-radius: 10px;/* 圆角，美观 */
+            width: 350px; /* 固定宽度，适配不同屏幕 */
+            text-align: center;/* 内容居中 */
+        }
+        .register-box h2 {margin-bottom: 20px; color: #333;}
+        .register-box input {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .register-box button {
+            width: 100%;/* 占满宽度*/
+            padding: 10px;
+            background: #4CAF50;/* 绿色注册按钮*/
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        .register-box button:hover {background: #45a049;}
+        .tip {margin-top: 15px; color: red; font-size: 14px;}/* 提示文字红色，小字号 */
+        .login-link {margin-top: 10px; font-size: 14px;}
+        .login-link a {color: #0066cc; text-decoration: none;}
+    </style>
+</head>
+<body>
+<div class="register-box">
+    <h2>五子棋对战 - 注册</h2>
+    <input type="text" id="username" placeholder="请输入用户名">
+    <input type="password" id="password" placeholder="请输入密码">
+    <button onclick="register()">注册</button>
+    <!-- 提示框：id=tip，显示注册成功/失败提示 -->
+    <div class="tip" id="tip"></div>
+    <!-- 登录跳转链接：跳login.html -->
+    <div class="login-link">已有账号？<a href="login.html">点击登录</a></div>
+</div>
+
+<script>
+    /*
+    一、ws.onopen 执行的具体例子（连接成功）
+    1. 用户打开 register.html 注册页，页面加载到 let ws = new WebSocket(...) 这行代码，发起 WS 连接请求
+    2. 后端 GobangWebSocket 类上的 @ServerEndpoint("/ws/gobang") 接收到连接请求
+    3. Tomcat 创建 GobangWebSocket 实例，还会为当前连接创建一个 Session 对象，触发 @OnOpen 注解的 onOpen 方法，将创建好的 Session 对象作为参数传递给该方法
+    4. 后端返回「WS 握手响应」，确认和前端建立长连接
+    5. 前端检测到 “后端确认连接成功”，触发 ws.onopen 绑定的函数，控制台打印：WS连接成功
+       （用户看不到，只有开发者工具的控制台能看到）
+
+    二、ws.onclose 执行的具体例子（连接关闭）
+    1. 用户在注册页输入账号密码，点击注册→后端返回 “注册成功”→前端延迟 1.5 秒跳转到 login.html，注册页被浏览器销毁
+    2. 后端检测到「前端页面销毁导致 WS 连接断开」，触发 GobangWebSocket 的 @OnClose 注解的 onClose 方法
+    3. 注意：由于用户还没登录，currentUser 为 null，方法会直接返回
+    4. 注意：由于页面快速跳转，浏览器可能没有足够时间触发 ws.onclose 事件
+       因此前端控制台可能不会打印 "WS连接关闭"，这是正常的浏览器行为
+
+    三、ws.onerror 执行的具体例子（连接错误）
+    1. 用户打开 register.html 注册页，但后端服务没启动（比如 Tomcat 没开，端口 8080 没监听）
+    2. 后端根本收不到前端的 WS 连接请求（因为服务没启动，端口 8080 没人 “接电话”）
+    3. 没有任何后端代码执行，也没有响应返回给前端
+    4. 前端检测到 “连接请求发出去后，后端无响应 / 连接失败”，触发 ws.onerror 绑定的函数
+       控制台打印错误：WS错误：ErrorEvent {isTrusted: true, type: 'error', message: '', ...}
+
+    ws.onerror 的常见场景（路径写错）
+    1. 前端代码把 WS 路径写成 ws://localhost:8080/ws/chess（正确是 /ws/gobang）
+    2. 后端 @ServerEndpoint("/ws/gobang") 识别不到这个路径，拒绝连接
+    3. 前端触发 ws.onerror，控制台打印连接错误日志
+    */
+    // 建立WS连接：页面加载就连，注册也需要走WS通信，window.location.host自动取当前域名 + 端口（比如localhost:8080）
+    let ws = new WebSocket("ws://" + window.location.host + "/ws/gobang");//（页面加载阶段，注册页刚打开、还没点击任何按钮），立刻执行
+    // 连接成功日志：调试用，用户看不到
+    ws.onopen = function() {console.log("WS连接成功");};
+    // 连接关闭日志：调试用
+    ws.onclose = function() {console.log("WS连接关闭");};
+    // 连接错误日志：调试用
+    ws.onerror = function(e) {console.error("WS错误：", e);};
+
+    // 接收后端消息：后端返回注册结果后触发，前端浏览器检测到 “后端推过来的这条消息” → 自动执行ws.onmessage里的函数
+    ws.onmessage = function(res) {
+        let data = JSON.parse(res.data);// 把后端的JSON字符串转成JS对象
+        document.getElementById("tip").innerText = data.data;
+        // 注册成功：1.5秒后跳登录页
+        if (data.code === "regOk") {
+            setTimeout(() => {window.location.href = "login.html";}, 1500);
+        }
+    };
+
+    // 注册方法
+    function register() {
+        //取输入值，trim()去掉首尾空格（避免用户输空/空格）
+        let username = document.getElementById("username").value.trim();
+        let password = document.getElementById("password").value.trim();
+        //校验非空：空则提示，不发消息
+        if (!username || !password) {
+            document.getElementById("tip").innerText = "用户名/密码不能为空！";
+            return;
+        }
+        //发注册消息给后端：JSON格式，type=register，data带账号密码
+        ws.send(JSON.stringify({//ws.send必须传字符串，所以用JSON.stringify把 JS 对象转成 JSON 字符串
+            type: "register",
+            data: {username: username, password: password}
+        }));
+    }
+</script>
+</body>
+</html>

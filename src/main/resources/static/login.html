@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>五子棋 - 登录</title>
+    <style>
+        * {margin: 0; padding: 0; box-sizing: border-box;}
+        body {
+            background: url("./img/login-bg.jpg") no-repeat center center;
+            background-size: cover;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .login-box {
+            background: rgba(255,255,255,0.8);
+            padding: 30px;
+            border-radius: 10px;
+            width: 350px;
+            text-align: center;
+        }
+        .login-box h2 {margin-bottom: 20px; color: #333;}
+        .login-box input {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .login-box button {
+            width: 100%;
+            padding: 10px;
+            background: #2196F3;/* 蓝色按钮 */
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        /* 按钮悬停样式（鼠标放上去时） */
+        .login-box button:hover {background: #0b7dda;}/* 更深的蓝色*/
+        .tip {margin-top: 15px; color: red; font-size: 14px;}
+        .reg-link {margin-top: 10px; font-size: 14px;}
+        .reg-link a {color: #0066cc; text-decoration: none;}
+    </style>
+</head>
+<body>
+<div class="login-box">
+    <h2>五子棋对战 - 登录</h2>
+    <input type="text" id="username" placeholder="请输入用户名">
+    <input type="password" id="password" placeholder="请输入密码">
+    <button onclick="login()">登录</button>
+    <div class="tip" id="tip"></div>
+    <div class="reg-link">没有账号？<a href="register.html">点击注册</a></div>
+</div>
+
+<script>
+    // WebSocket连接
+    let ws = new WebSocket("ws://" + window.location.host + "/ws/gobang");
+    ws.onopen = function() {console.log("WS连接成功");};
+    ws.onclose = function() {console.log("WS连接关闭");};
+    ws.onerror = function(e) {console.error("WS错误：", e);};
+
+    // 接收后端消息
+    ws.onmessage = function(res) {
+        // 解析后端返回的JSON数据
+        let data = JSON.parse(res.data);
+        // 登录成功的情况
+        if (data.code === "loginOk") {
+            // 1. 后端会返回 { user, token }，用于跨页面/重连绑定 WS（防止仅凭用户名冒充），这里localStorage.setItem()将数据存储到浏览器的本地存储中且只能存储字符串
+            localStorage.setItem("user", JSON.stringify(data.data.user));
+            localStorage.setItem("token", data.data.token);
+            // 2. 显示友好提示（不直接显示对象）
+            document.getElementById("tip").innerText = "登录成功！即将跳转大厅...";
+            document.getElementById("tip").style.color = "green"; // 提示变绿色
+            // 3. 延迟1.5秒跳大厅（避免连接没处理完）
+            setTimeout(() => {window.location.href = "hall.html";}, 1500);
+        } else {
+            // 登录失败：显示具体错误（比如密码错、账号已登录）
+            document.getElementById("tip").innerText = data.data;
+        }
+    };
+
+    // 登录方法（没改，和原来一样）
+    function login() {
+        let username = document.getElementById("username").value.trim();
+        let password = document.getElementById("password").value.trim();
+        if (!username || !password) {
+            document.getElementById("tip").innerText = "用户名/密码不能为空！";
+            return;
+        }
+        // 发送登录消息给后端
+        ws.send(JSON.stringify({
+            type: "login",
+            data: {username: username, password: password}
+        }));
+    }
+</script>
+</body>
+</html>

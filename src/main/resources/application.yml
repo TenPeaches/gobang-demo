@@ -1,0 +1,14 @@
+server:
+  port: 8080  # 服务端口
+
+spring:
+  # 默认启用 dev 配置（可通过环境变量/启动参数覆盖：SPRING_PROFILES_ACTIVE=prod 等）
+  profiles:
+    default: dev
+
+# MyBatis配置（核心：开启驼峰转换）
+mybatis:
+  mapper-locations: classpath:mapper/*.xml  # Mapper XML路径
+  type-aliases-package: com.gobang.entity   # 实体类别名包
+  configuration:
+    map-underscore-to-camel-case: true      # 开启下划线→驼峰自动转换

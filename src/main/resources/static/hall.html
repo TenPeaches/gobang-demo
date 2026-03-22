@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>五子棋 - 匹配大厅</title>
+    <style>
+        * {margin: 0; padding: 0; box-sizing: border-box;}
+        body {
+            background: url("./img/hall-bg.jpg") no-repeat center center;
+            background-size: cover;
+            height: 100vh;
+            display: flex;
+            flex-direction: column; /* 垂直排列（头部在上，大厅主体在下） */
+            align-items: center; /* 水平居中 */
+            color: white; /* 文字白色（适配深色背景） */
+        }
+        .header {
+            width: 100%;
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;/* 左右两端对齐（用户信息在左，退出按钮在右） */
+            align-items: center;
+            font-size: 18px;
+        }
+        .logout-btn {
+            padding: 8px 15px;
+            background: #f44336;/* 红色退出按钮（警示色，明确退出操作） */
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .logout-btn:hover {
+            background: #d32f2f;
+        }
+        .hall-box {
+            background: rgba(0,0,0,0.6);/* 黑色半透明（比注册/登录页更深，符合大厅氛围） */
+            padding: 40px;
+            border-radius: 10px;
+            text-align: center;
+            margin-top: 50px;/* 距离头部有间距 */
+        }
+        .hall-box h2 {margin-bottom: 30px;}
+        .user-info {margin-bottom: 20px; font-size: 16px;}
+        .rank-info {color: #4CAF50; margin-bottom: 10px;}
+        .match-btn {
+            padding: 15px 50px;
+            background: #FF9800;/* 橙色匹配按钮（醒目，引导点击） */
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 18px;
+            margin-top: 10px;
+            width: 200px; /* 固定宽度，确保对齐 */
+            display: block; /* 块级元素，确保居中 */
+            margin-left: auto; /* 水平居中 */
+            margin-right: auto;
+        }
+        .match-btn:disabled {
+            background: #ccc; /* 禁用状态（匹配中）是灰色，不能点击 */
+            cursor: not-allowed; /* 鼠标放上去是“禁止”图标 */
+        }
+        .cancel-btn {
+            padding: 15px 50px;
+            background: #f44336;/* 红色取消按钮 */
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 18px;
+            margin-top: 10px;
+            width: 200px; /* 固定宽度，与匹配按钮一致 */
+            display: none; /* 默认隐藏，匹配中时显示 */
+            margin-left: auto; /* 水平居中 */
+            margin-right: auto;
+        }
+        .cancel-btn:hover {
+            background: #d32f2f;
+        }
+        .tip {
+            color: #ffeb3b; /* 提示文字黄色（醒目，比如“匹配中...”） */
+            margin-top: 15px;
+        }
+
+    </style>
+</head>
+<body>
+<div class="header">
+    <span id="userInfo"></span><!-- 显示“当前登录：XXX” -->
+    <button class="logout-btn" onclick="logout()">退出登录</button>
+</div>
+<div class="hall-box">
+    <h2>五子棋对战大厅</h2>
+    <div class="user-info" id="scoreInfo">积分：--</div> <!-- 积分 -->
+    <div class="rank-info" id="rankInfo">段位：--</div><!-- 段位 -->
+    <button class="match-btn" id="matchBtn" onclick="startMatch()">开始匹配</button><!-- 匹配按钮 -->
+    <button class="cancel-btn" id="cancelBtn" onclick="cancelMatch()">取消匹配</button><!-- 取消匹配按钮 -->
+    <div class="tip" id="tip"></div><!-- 匹配提示（比如“匹配中...”） -->
+</div>
+
+<script>
+    // 全局WS对象
+    let ws = null;
+    // 标记是否正在退出登录（用于避免 ws.onclose 弹窗）
+    let isLoggingOut = false;
+    // 重连次数
+    let reconnectAttempts = 0;
+    // 最大重连次数
+    const MAX_RECONNECT_ATTEMPTS = 5;
+    // 从localStorage取用户信息（登录页存的）
+    let user = JSON.parse(localStorage.getItem("user"));
+    let token = localStorage.getItem("token");
+    
+    if (!user) {
+        alert("请先登录！");
+        window.location.href = "login.html";// 没登录直接跳登录页
+    }
+
+    // 初始化用户信息展示
+    function initUserInfo() {
+        document.getElementById("userInfo").innerText = "当前登录：" + user.username;
+        document.getElementById("scoreInfo").innerText = "当前积分：" + user.score;
+        let rank = getRank(user.score); // 调用段位计算方法
+        document.getElementById("rankInfo").innerText = "当前段位：" + rank;
+    }
+
+    // 初始化WebSocket连接（含重连机制）
+    function initWebSocket() {
+        // 关闭旧连接
+        if (ws) {
+            ws.close();
+        }
+
+        // 创建新连接
+        ws = new WebSocket("ws://" + window.location.host + "/ws/gobang");
+
+        // 连接成功
+        ws.onopen = function() {
+            console.log("WS连接成功");
+            // 重置重连次数
+            reconnectAttempts = 0;
+            // 绑定用户（告诉后端“当前WS连接对应的是哪个用户”）
+            ws.send(JSON.stringify({
+                type: "bindUser",
+                data: {username: user.username, token: token}
+            }));
+            // 重置匹配按钮状态
+            document.getElementById("matchBtn").disabled = false; //启用匹配按钮，允许用户点击
+            document.getElementById("matchBtn").innerText = "开始匹配";
+            document.getElementById("cancelBtn").style.display = "none"; // 隐藏取消按钮
+            document.getElementById("tip").innerText = "";
+        };
+
+        // 连接关闭（自动重连）
+        ws.onclose = function() {
+            // 如果正在退出登录，不处理 onclose（避免弹窗）
+            if (isLoggingOut) {
+                return;
+            }
+            
+            console.log("WS连接断开，尝试重连...");
+            
+            // 仅当未退出登录时重连（但如果是用户主动关闭窗口，不应该重连）
+            if (localStorage.getItem("user") && document.visibilityState !== 'hidden') { // 只有在页面可见时才重连，比如匹配成功进入游戏就不会重连
+                // 限制重连次数
+                if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+                    reconnectAttempts++;
+                    // 指数退避重连，避免频繁重连
+                    const delay = Math.min(1000 * Math.pow(2, reconnectAttempts - 1), 10000);
+                    console.log(`第${reconnectAttempts}次重连，延迟${delay}ms`);
+                    setTimeout(initWebSocket, delay);
+                } else {
+                    console.log("重连失败，已达到最大重连次数");
+                    alert("网络连接不稳定，请刷新页面重试！");
+                }
+            } else {
+                // 如果 localStorage 中没有 user，说明已经退出登录，跳转登录页
+                if (!localStorage.getItem("user")) {
+                    alert("连接断开，请重新登录！");
+                    window.location.href = "login.html";
+                }
+            }
+        };
+
+        //连接错误：关闭连接（触发onclose重连）
+        ws.onerror = function(e) {
+            console.error("WS连接错误：", e);
+            ws.close();
+        };
+
+        // 接收后端消息：分发处理
+        ws.onmessage = function(res) {
+            try {
+                let data = JSON.parse(res.data);
+                handleWsMessage(data);
+            } catch (e) {
+                console.error("解析WS消息失败：", e);
+                alert("消息解析失败，请刷新页面重试！");
+            }
+        };
+    }
+
+    // 处理WebSocket消息
+    function handleWsMessage(data) {
+        // 用户绑定结果
+        if (data.code === "bindOk") {
+            console.log("用户绑定成功");
+            // 绑定成功后，拉取最新用户信息（比如登录后积分有更新）
+            ws.send(JSON.stringify({
+                type: "getUserInfo",
+                data: {username: user.username}
+            }));
+        } else if (data.code === "bindFail") {
+            // 绑定失败（可能是后端Session已过期，比如直接关闭窗口后重新访问）
+            alert("登录已过期，请重新登录！");
+            // 清除本地存储，避免下次访问时再次尝试绑定
+            localStorage.removeItem("user");
+            localStorage.removeItem("token");
+            localStorage.removeItem("matchInfo");
+            window.location.href = "login.html";
+        }
+
+        // 拉取用户信息结果（更新积分/段位）
+        else if (data.code === "userInfoOk") {
+            let newUser = data.data;
+            user = newUser; // 更新全局user
+            localStorage.setItem("user", JSON.stringify(newUser)); // 同步到localStorage
+            initUserInfo(); // 重新渲染用户信息
+        } else if (data.code === "userInfoFail") {
+            alert("获取最新积分失败，请刷新页面！");
+        }
+
+        // 匹配相关消息
+        else if (data.code === "matchWaiting") {
+            document.getElementById("tip").innerText = data.data; // 显示“匹配中...”
+            document.getElementById("matchBtn").disabled = true; // 禁用按钮
+            document.getElementById("matchBtn").innerText = "匹配中..."; // 按钮文字变
+            document.getElementById("cancelBtn").style.display = "block"; // 显示取消按钮
+        } else if (data.code === "cancelMatchOk") {
+            document.getElementById("tip").innerText = data.data; // 显示“已取消匹配”
+            document.getElementById("matchBtn").disabled = false; // 恢复按钮可点击
+            document.getElementById("matchBtn").innerText = "开始匹配";
+            document.getElementById("cancelBtn").style.display = "none"; // 隐藏取消按钮
+        } else if (data.code === "cancelMatchFail") {
+            alert(data.data); // 显示取消匹配失败的原因
+        } else if (data.code === "matchSuccess") {
+            // 匹配成功：校验信息完整→存到localStorage→跳游戏页
+            if (!data.data || !data.data.self || !data.data.opponent || !data.data.roomId) {
+                alert("匹配信息不完整，请重新匹配！");
+                document.getElementById("matchBtn").disabled = false;
+                document.getElementById("matchBtn").innerText = "开始匹配";
+                return;
+            }
+            // 保存匹配信息并跳转到游戏页
+            localStorage.setItem("matchInfo", JSON.stringify(data.data)); // 存匹配信息（游戏页要用）
+            document.getElementById("cancelBtn").style.display = "none"; // 隐藏取消按钮
+            window.location.href = "game.html"; // 跳游戏页
+        } else if (data.code === "matchTimeout") {
+            document.getElementById("tip").innerText = data.data; // 显示“匹配超时”
+            document.getElementById("matchBtn").disabled = false; // 恢复按钮可点击
+            document.getElementById("matchBtn").innerText = "开始匹配";
+            document.getElementById("cancelBtn").style.display = "none"; // 隐藏取消按钮
+        } else if (data.code === "matchFail") {
+            document.getElementById("tip").innerText = data.data; // 显示“匹配失败”
+            document.getElementById("matchBtn").disabled = false;
+            document.getElementById("matchBtn").innerText = "开始匹配";
+            document.getElementById("cancelBtn").style.display = "none"; // 隐藏取消按钮
+        }
+
+        // 退出登录结果
+        else if (data.code === "logoutOk") {
+            isLoggingOut = true; // 标记正在退出，避免 ws.onclose 弹窗
+            localStorage.removeItem("user"); // 删除localStorage的user
+            localStorage.removeItem("token");
+            localStorage.removeItem("matchInfo"); // 删除匹配信息
+            window.location.href = "login.html"; // 跳登录页
+        }
+
+        // 通用错误
+        else if (data.code === "error") {
+            alert("系统错误：" + data.data);
+        }
+    }
+
+    // 开始匹配
+    function startMatch() {
+        // 先判断WS连接是否就绪（避免没连好就发消息）
+        if (!ws || ws.readyState !== WebSocket.OPEN) {
+            alert("网络连接未就绪，请稍等！");
+            return;
+        }
+        // 发匹配消息（type=startMatch，data为空）
+        ws.send(JSON.stringify({
+            type: "startMatch",
+            data: {}
+        }));
+    }
+
+    // 取消匹配
+    function cancelMatch() {
+        // 先判断WS连接是否就绪
+        if (!ws || ws.readyState !== WebSocket.OPEN) {
+            alert("网络连接未就绪，请稍等！");
+            return;
+        }
+        // 发取消匹配消息（type=cancelMatch，data为空）
+        ws.send(JSON.stringify({
+            type: "cancelMatch",
+            data: {}
+        }));
+    }
+
+    // 退出登录
+    function logout() {
+        if (confirm("确定退出登录吗？")) { // 弹出确认框，避免误点
+            if (ws && ws.readyState === WebSocket.OPEN) {//=== 是 JS 里的既要值完全相等，也要数据类型完全相等
+                // 发退出登录消息给后端（后端处理：移除在线用户等）
+                ws.send(JSON.stringify({
+                    type: "logout",
+                    data: {}
+                }));
+            } else {
+                // WS没连接，直接删除localStorage跳登录页
+                localStorage.removeItem("user");
+                localStorage.removeItem("token");
+                localStorage.removeItem("matchInfo");
+                window.location.href = "login.html";
+            }
+        }
+    }
+
+    // 计算段位
+    function getRank(score) {
+        if (score <= 1000) return "入门级";
+        else if (score <= 2000) return "进阶级";
+        else return "高手级";
+    }
+
+    // 页面卸载时的处理（用户直接关闭窗口或刷新页面）
+    window.addEventListener('beforeunload', function() {
+        // 关闭 WebSocket 连接，避免后端 Session 残留
+        if (ws) {
+            ws.close();
+        }
+    });
+
+    // 页面初始化，当页面所有资源（HTML 结构、CSS 样式、图片、JS 代码）加载完毕后，浏览器会自动触发 window.onload 绑定的函数
+    window.onload = function() {
+        initUserInfo(); // 渲染用户信息
+        initWebSocket(); // 建立WS连接
+    };
+</script>
+</body>
+</html>

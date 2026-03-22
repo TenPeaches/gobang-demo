@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>五子棋 - 对战</title>
+    <style>
+        /* 全局样式重置 */
+        * {
+            margin: 0; /* 清除所有元素的默认外边距 */
+            padding: 0; /* 清除所有元素的默认内边距 */
+            box-sizing: border-box; /* 使用盒模型，确保元素宽度包含内边距和边框 */
+        }
+        
+        /* 页面主体样式 */
+        body {
+            background: url("./img/game-bg.jpg") no-repeat center center; /* 设置背景图片，居中显示，不重复 */
+            background-size: cover; /* 背景图片覆盖整个页面 */
+            height: 100vh; /* 页面高度为视口高度 */
+            display: flex; /* 使用flex布局 */
+            justify-content: center; /* 水平居中 */
+            align-items: center; /* 垂直居中 */
+            color: white; /* 文字颜色为白色 */
+            position: relative; /* 相对定位，让子元素可以使用绝对定位 */
+        }
+        
+        /* 游戏容器样式 */
+        .game-container {
+            display: flex; /* 使用flex布局 */
+            align-items: center; /* 垂直居中对齐 */
+            gap: 30px; /* 面板和棋盘之间的间距 */
+        }
+        
+        /* 用户信息面板样式 */
+        .user-panel {
+            background: rgba(0,0,0,0.7); /* 黑色半透明背景 */
+            padding: 20px; /* 内边距 */
+            border-radius: 10px; /* 圆角边框 */
+            width: 200px; /* 固定宽度 */
+            text-align: center; /* 文本居中 */
+        }
+        
+        /* 用户面板标题样式 */
+        .user-panel h3 {
+            margin-bottom: 15px; /* 标题下方边距 */
+        }
+        
+        /* 用户面板段落样式 */
+        .user-panel p {
+            margin: 8px 0; /* 段落上下边距 */
+        }
+        
+        /* 棋盘样式 */
+        .chess-board {
+            width: 600px; /* 棋盘宽度 */
+            height: 600px; /* 棋盘高度 */
+            background: rgba(200,150,100,0.8); /* 木质棋盘底色，半透明 */
+            border: 5px solid #8B4513; /* 深棕色边框 */
+            display: grid; /* 使用grid布局 */
+            grid-template-columns: repeat(15, 1fr); /* 15列，每列等分 */
+            grid-template-rows: repeat(15, 1fr); /* 15行，每行等分 */
+        }
+        
+        /* 棋盘格子样式 */
+        .chess-cell {
+            border: 1px solid rgba(0,0,0,0.2); /* 格子边框，浅黑色 */
+            display: flex; /* 使用flex布局 */
+            justify-content: center; /* 水平居中 */
+            align-items: center; /* 垂直居中 */
+            cursor: pointer; /* 鼠标放上去是手型，提示可点击 */
+        }
+        
+        /* 黑子样式：黑色圆形 */
+        .chess-black {
+            width: 80%; /* 黑子宽度为格子的80% */
+            height: 80%; /* 黑子高度为格子的80% */
+            border-radius: 50%; /* 圆形 */
+            background: #000; /* 黑色 */
+        }
+        
+        /* 白子样式：白色圆形，加浅边框 */
+        .chess-white {
+            width: 80%; /* 白子宽度为格子的80% */
+            height: 80%; /* 白子高度为格子的80% */
+            border-radius: 50%; /* 圆形 */
+            background: #fff; /* 白色 */
+            border: 1px solid #ccc; /* 浅灰色边框，增加立体感 */
+        }
+        
+        /* 提示信息样式 */
+        .tip {
+            position: absolute; /* 绝对定位 */
+            top: 20px; /* 距离顶部20px */
+            font-size: 24px; /* 字体大小 */
+            color: #ffeb3b; /* 黄色提示，醒目 */
+            text-shadow: 0 0 10px #000; /* 文字阴影，避免和背景融合 */
+        }
+        
+        /* 返回按钮样式 */
+        .back-btn {
+            position: absolute; /* 绝对定位 */
+            top: 80px; /* 距离顶部80px */
+            padding: 10px 20px; /* 内边距 */
+            background: #f44336; /* 红色背景 */
+            color: white; /* 白色文字 */
+            border: none; /* 无边框 */
+            border-radius: 5px; /* 圆角边框 */
+            cursor: pointer; /* 鼠标放上去是手型 */
+            font-size: 16px; /* 字体大小 */
+            display: none; /* 默认隐藏，胜负后显示 */
+        }
+        
+        /* 返回按钮 hover 效果 */
+        .back-btn:hover {
+            background: #d32f2f; /* 鼠标悬停时背景色加深 */
+        }
+
+    </style>
+</head>
+<body>
+<div class="tip" id="turnTip">等待对手加入...</div>
+<button class="back-btn" id="backBtn" onclick="backToHall()">返回大厅</button>
+<div class="game-container">
+    <!-- 自己的信息面板 -->
+    <div class="user-panel" id="selfPanel">
+        <h3>我方</h3>
+        <p id="selfName">加载中...</p>
+        <p id="selfScore">积分：--</p>
+        <p id="selfRank">段位：--</p>
+    </div>
+
+    <!-- 棋盘 -->
+    <div class="chess-board" id="chessBoard"></div>
+
+    <!-- 对手的信息面板 -->
+    <div class="user-panel" id="opponentPanel">
+        <h3>对手</h3>
+        <p id="opponentName">加载中...</p>
+        <p id="opponentScore">积分：--</p>
+        <p id="opponentRank">段位：--</p>
+    </div>
+</div>
+
+<script>
+    // 全局变量
+    let user = JSON.parse(localStorage.getItem("user"));
+    let token = localStorage.getItem("token");
+    // 重连次数
+    let reconnectAttempts = 0;
+    // 最大重连次数
+    const MAX_RECONNECT_ATTEMPTS = 5;
+    
+    // 未登录直接访问游戏页：跳登录（必须在访问 matchInfo 之前检查）
+    if (!user || !token) {
+        alert("请先登录！");
+        localStorage.removeItem("matchInfo");
+        window.location.href = "login.html";
+    }
+    
+    let matchInfo = JSON.parse(localStorage.getItem("matchInfo"));
+    let roomId = matchInfo ? matchInfo.roomId : null;
+    let isMyTurn = false; // 标记是否是自己的回合
+    let gameOver = false; // 标记游戏是否结束
+
+    // 校验：匹配信息不全则跳大厅（只有已登录才检查）
+    if (user && token && (!matchInfo || !matchInfo.self || !matchInfo.opponent || !matchInfo.roomId)) {
+        alert("匹配信息异常，请返回大厅重新匹配！");
+        localStorage.removeItem("matchInfo");
+        window.location.href = "hall.html";
+    }
+
+    // 初始化棋盘，用双层 for 循环生成 15×15 个chess-cell格子，每个格子用dataset.x/y存坐标
+    function initChessBoard() {
+        let chessBoard = document.getElementById("chessBoard");
+        chessBoard.innerHTML = ""; // 清空棋盘（避免重复生成）
+        // CSS 给棋盘画了一个 15×15 的 “空白网格框”，这里循环15行×15列，生成225个格子
+        for (let i = 0; i < 15; i++) {
+            for (let j = 0; j < 15; j++) {
+                // 创建单个格子
+                let cell = document.createElement("div");
+                cell.className = "chess-cell";
+                cell.dataset.x = i; // 存x坐标（自定义属性）
+                cell.dataset.y = j; // 存y坐标
+                // 格子点击事件：只有自己回合且游戏未结束，才能落子
+                cell.onclick = function() {
+                    if (gameOver || !isMyTurn) return;
+                    placeChess(this); // 执行落子逻辑
+                };
+                //把这个格子挂载到棋盘上（页面上能看到了）
+                chessBoard.appendChild(cell);
+            }
+        }
+    }
+
+    // 渲染双方信息
+    function renderUserInfo() {
+        // 自己的信息
+        document.getElementById("selfName").innerText = "账号：" + matchInfo.self.username;
+        document.getElementById("selfScore").innerText = "积分：" + matchInfo.self.score;
+        document.getElementById("selfRank").innerText = "段位：" + getRank(matchInfo.self.score);
+
+        // 对手的信息
+        document.getElementById("opponentName").innerText = "账号：" + matchInfo.opponent.username;
+        document.getElementById("opponentScore").innerText = "积分：" + matchInfo.opponent.score;
+        document.getElementById("opponentRank").innerText = "段位：" + getRank(matchInfo.opponent.score);
+    }
+
+    // 落子方法
+    function placeChess(cell) {
+        let x = parseInt(cell.dataset.x); // 取x坐标（转数字）
+        let y = parseInt(cell.dataset.y); // 取y坐标
+        // 发落子消息给后端：type=placeChess，带坐标和房间ID
+        ws.send(JSON.stringify({
+            type: "placeChess",
+            data: {x: x, y: y, roomId: roomId}
+        }));
+        // 落子后暂时标记为非自己回合（等后端确认）
+        isMyTurn = false;
+        document.getElementById("turnTip").innerText = "等待对手落子...";
+    }
+
+    // 渲染棋子
+    function renderChess(x, y, player) {
+        let cells = document.getElementsByClassName("chess-cell");
+        let index = x * 15 + y; // 计算格子的索引（15行，x是行号，y是列号）
+        let cell = cells[index];
+        // player=1（先手）放黑子，player=2（后手）放白子
+        if (player === 1) {
+            cell.innerHTML = '<div class="chess-black"></div>';
+        } else {
+            cell.innerHTML = '<div class="chess-white"></div>';
+        }
+        cell.onclick = null; // 落子后禁用该格子（不能重复落子）
+    }
+
+    // 计算段位
+    function getRank(score) {
+        if (score <= 1000) return "入门级";
+        else if (score <= 2000) return "进阶级";
+        else return "高手级";
+    }
+
+    // 返回大厅
+    function backToHall() {
+        localStorage.removeItem("matchInfo");
+        window.location.href = "hall.html";
+    }
+
+    // 游戏结束处理
+    function gameOverHandle(msg) {
+        gameOver = true; // 标记游戏结束
+        document.getElementById("turnTip").innerText = msg; // 显示胜负提示（比如“你赢了！”）
+        document.getElementById("backBtn").style.display = "block"; // 显示返回按钮
+        // 禁用所有格子的点击事件
+        let cells = document.getElementsByClassName("chess-cell");
+        for (let cell of cells) {
+            cell.onclick = null;
+        }
+    }
+
+
+
+    // 初始化WebSocket连接
+    let ws;
+    function initWebSocket() {
+
+        
+        ws = new WebSocket("ws://" + window.location.host + "/ws/gobang");
+        ws.onopen = function() {
+            console.log("WS连接成功");
+            // 重置重连次数
+            reconnectAttempts = 0;
+            // 先绑定用户，绑定成功后再获取房间信息
+            ws.send(JSON.stringify({
+                type: "bindUser",
+                data: {username: user.username, token: token}
+            }));
+        };
+        ws.onclose = function() {
+            if (gameOver) {
+                return;
+            }
+            
+            console.log("WS连接断开，尝试重连...");
+            
+            // 限制重连次数
+            if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+                reconnectAttempts++;
+                // 指数退避重连，避免频繁重连
+                const delay = Math.min(1000 * Math.pow(2, reconnectAttempts - 1), 10000);
+                console.log(`第${reconnectAttempts}次重连，延迟${delay}ms`);
+                setTimeout(initWebSocket, delay);
+            } else {
+                console.log("重连失败，已达到最大重连次数");
+                alert("网络连接不稳定，请返回大厅重新匹配！");
+                backToHall();
+            }
+        };
+        ws.onerror = function(e) {
+            console.error("WS错误：", e);
+            ws.close();
+        };
+        ws.onmessage = function(res) {
+            //setTimeout(() => {}, 0) 给了浏览器一个 “喘息的机会”：把大括号里的代码，推迟到 “当前所有同步任务全部执行完毕后”，再执行
+            setTimeout(() => {
+                try {
+                    let data = JSON.parse(res.data);
+                    handleWsMessage(data);
+                } catch (e) {
+                    console.error("解析WS消息失败：", e);
+                    alert("消息解析失败，请返回大厅重新匹配！");
+                    backToHall();
+                }
+            }, 0);
+        };
+    }
+
+    // 处理WebSocket消息
+    function handleWsMessage(data) {
+        switch (data.code) {
+            case "bindOk": // 用户绑定成功
+                console.log("用户绑定成功");
+                // 绑定成功后再获取房间信息
+                ws.send(JSON.stringify({
+                    type: "getRoom",
+                    data: {roomId: roomId}
+                }));
+                break;
+            case "bindFail": // 用户绑定失败（可能是Session已过期）
+                alert("登录已过期，请重新登录！");
+                localStorage.removeItem("user");
+                localStorage.removeItem("token");
+                localStorage.removeItem("matchInfo");
+                window.location.href = "login.html";
+                break;
+            case "chessOk": // 落子成功
+                let chess = data.data;
+                renderChess(chess.x, chess.y, chess.player); // 渲染棋子
+                // 核心：判断当前回合是否是自己的
+                // player=1 是先手（Room.user1），player=2 是后手（Room.user2）
+                let isSelfPlayer1 = (matchInfo.self.id === matchInfo.roomUser1Id);
+                if (chess.player === 1) {
+                    // 这一步是先手刚刚落完子，下一回合轮到后手
+                    isMyTurn = !isSelfPlayer1;
+                } else {
+                    // 这一步是后手刚刚落完子，下一回合轮到先手
+                    isMyTurn = isSelfPlayer1;
+                }
+                // 更新回合提示
+                document.getElementById("turnTip").innerText = isMyTurn ? "你的回合" : "对手回合";
+                break;
+            case "win": // 赢了
+                gameOverHandle(data.data);
+                break;
+            case "lose": // 输了
+                gameOverHandle(data.data);
+                break;
+            case "oppLeave": // 对手离开
+                gameOverHandle(data.data);
+                break;
+            case "placeFail": // 落子失败
+                alert(data.data);
+                // 如果是“还没到你的回合”，更新提示
+                if (data.data.includes("还没到你的回合")) {
+                    isMyTurn = false;
+                    document.getElementById("turnTip").innerText = "对手回合";
+                }
+                break;
+            case "roomOk":// 房间信息确认成功
+                // 初始化回合：判断自己是否是先手（user1）
+                isMyTurn = (matchInfo.self.id === matchInfo.roomUser1Id);
+                document.getElementById("turnTip").innerText = isMyTurn ? "你的回合" : "对手回合";
+                break;
+            case "roomFail":
+                alert("未匹配到房间，请返回大厅重新匹配！");
+                backToHall();
+                break;
+            case "error":
+                alert("系统错误：" + data.data);
+                backToHall();
+                break;
+        }
+    }
+
+    // 页面卸载时的处理（用户直接关闭窗口或刷新页面）
+    window.addEventListener('beforeunload', function() {
+        // 关闭 WebSocket 连接，避免后端 Session 残留
+        if (ws) {
+            ws.close();
+        }
+    });
+
+    // 页面初始化
+    window.onload = function() {
+        initChessBoard();
+        renderUserInfo();
+        // 不再在前端自行推断先手ID，直接依赖后端在 matchSuccess 中下发的 roomUser1Id
+        if (!matchInfo.roomUser1Id) {
+            alert("匹配信息缺少先手标识，请返回大厅重新匹配！");
+            backToHall();
+            return;
+        }
+        initWebSocket();
+    };
+</script>
+</body>
+</html>
